@@ -10,19 +10,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Paso 1: Clonar el repositorio
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      # Paso 2: Configurar Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '22'
 
+      # Paso 3: Instalar dependencias
       - name: Install dependencies
         run: npm install
 
+      # Paso 4: Ejecutar el bot Strava
       - name: Run Strava Bot
-        run: node bot.js   # <-- esta línea es imprescindible
-       env:
-  STRAVA_ACCESS_TOKEN: ${{ secrets.STRAVA_ACCESS_TOKEN }}
-  NUM_ACTIVITIES: 1
+        run: node bot.js
+        env:
+          STRAVA_ACCESS_TOKEN: ${{ secrets.STRAVA_ACCESS_TOKEN }}
+          NUM_ACTIVITIES: 1   # número de actividades a actualizar
