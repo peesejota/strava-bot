@@ -8,7 +8,7 @@ async function getActivities() {
   try {
     const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
       headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
-      params: { per_page: 5 } // traer las 5 últimas actividades
+      params: { per_page: 1 } // traer las 5 últimas actividades
     });
     return response.data;
   } catch (err) {
