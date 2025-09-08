@@ -1,31 +1,27 @@
 const axios = require('axios');
 
-// Pega tu access token aquí
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN; // reemplaza con tu token
+// Leer token desde la variable de entorno
+const ACCESS_TOKEN = process.env.STRAVA_ACCESS_TOKEN;
+
+if (!ACCESS_TOKEN) {
+  console.error('Error: STRAVA_ACCESS_TOKEN is not defined');
+  process.exit(1);
+}
 
 // Función para obtener tus últimas actividades
 async function getActivities() {
   try {
     const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-      headers: { Authorization: `Bearer ${STRAVA_ACCESS_TOKEN}` },
-      params: { per_page: 1 } // traer las 5 últimas actividades
+      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+      params: { per_page: 1 } // traer 1 actividad (NUM_ACTIVITIES)
     });
     return response.data;
   } catch (err) {
-if (err.response) {
-  try {
-  // tu código para obtener actividades
-} catch (err) {
-  if (err.response && err.response.data) {
-    console.error('Error al obtener actividades:', err.response.data);
-  } else {
-    console.error('Error al obtener actividades:', err.message);
-  }
-}
-
-} else {
-  console.error('Error al obtener actividades:', err.message);
-}
+    if (err.response && err.response.data) {
+      console.error('Error al obtener actividades:', err.response.data);
+    } else {
+      console.error('Error al obtener actividades:', err.message);
+    }
   }
 }
 
@@ -39,7 +35,11 @@ async function updateActivity(activityId, newDescription) {
     });
     console.log(`Actividad ${activityId} actualizada correctamente.`);
   } catch (err) {
-    console.error('Error al actualizar actividad:', err.response.data);
+    if (err.response && err.response.data) {
+      console.error('Error al actualizar actividad:', err.response.data);
+    } else {
+      console.error('Error al actualizar actividad:', err.message);
+    }
   }
 }
 
