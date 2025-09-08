@@ -13,7 +13,16 @@ async function getActivities() {
     return response.data;
   } catch (err) {
 if (err.response) {
-  console.error('Error al obtener actividades:', err.response.data);
+  try {
+  // tu código para obtener actividades
+} catch (err) {
+  if (err.response && err.response.data) {
+    console.error('Error al obtener actividades:', err.response.data);
+  } else {
+    console.error('Error al obtener actividades:', err.message);
+  }
+}
+
 } else {
   console.error('Error al obtener actividades:', err.message);
 }
