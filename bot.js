@@ -7,7 +7,7 @@ const ACCESS_TOKEN = process.env.ACCESS_TOKEN; // reemplaza con tu token
 async function getActivities() {
   try {
     const response = await axios.get('https://www.strava.com/api/v3/athlete/activities', {
-      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+      headers: { Authorization: `Bearer ${STRAVA_ACCESS_TOKEN}` },
       params: { per_page: 1 } // traer las 5 últimas actividades
     });
     return response.data;
