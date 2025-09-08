@@ -12,7 +12,11 @@ async function getActivities() {
     });
     return response.data;
   } catch (err) {
-    console.error('Error al obtener actividades:', err.response.data);
+if (err.response) {
+  console.error('Error al obtener actividades:', err.response.data);
+} else {
+  console.error('Error al obtener actividades:', err.message);
+}
   }
 }
 
