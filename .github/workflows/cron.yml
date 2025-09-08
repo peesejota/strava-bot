@@ -2,7 +2,7 @@ name: Strava Bot Cron
 
 on:
   schedule:
-    - cron: '* * * * *'  # cada minuto
+    - cron: '*/5 * * * *'  # cada 5 minutos
   workflow_dispatch: # permite ejecutar manualmente
 
 jobs:
@@ -24,5 +24,4 @@ jobs:
       - name: Run Strava Bot
         env:
           STRAVA_ACCESS_TOKEN: ${{ secrets.STRAVA_ACCESS_TOKEN }}
-          NUM_ACTIVITIES: 1   # actualizar solo 1 actividad
-        run: node bot.js
+          NUM_ACTIVITIES: 1   # actualizar solo 1 act_
