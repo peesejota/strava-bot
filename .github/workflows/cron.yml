@@ -25,8 +25,10 @@ jobs:
         run: npm install
 
       # Paso 4: Ejecutar el bot Strava
-      - name: Run Strava Bot
-        run: node bot.js
-        env:
-          STRAVA_ACCESS_TOKEN: ${{ secrets.STRAVA_ACCESS_TOKEN }}
-          NUM_ACTIVITIES: 1   # número de actividades a actualizar
+- name: Run Strava Bot
+  run: node bot.js
+  env:
+    STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
+    STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+    STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
+    NUM_ACTIVITIES: 1 #número de actividades
