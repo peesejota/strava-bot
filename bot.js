@@ -23,7 +23,7 @@ async function getActivities(accessToken) {
       'https://www.strava.com/api/v3/athlete/activities',
       {
         headers: { Authorization: `Bearer ${accessToken}` },
-        params: { per_page: process.env.NUM_ACTIVITIES || 1 }
+        params: { per_page: process.env.NUM_ACTIVITIES || 10 } //Número de actividades que se actualizan
       }
     );
     return response.data;
