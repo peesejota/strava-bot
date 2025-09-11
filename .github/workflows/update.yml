@@ -1,11 +1,12 @@
-name: Update Strava activities
+name: Update Strava Activity
 
 on:
-  workflow_dispatch:   # permite lanzarlo manualmente o vía API
+  workflow_dispatch: # se dispara desde Telegram
 
 jobs:
-  run-bot:
+  update-activity:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -13,12 +14,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 22
+          node-version: '18'
 
       - name: Install dependencies
         run: npm install
 
-      - name: Run Strava bot
+      - name: Run bot.js
         run: node bot.js
         env:
           STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
