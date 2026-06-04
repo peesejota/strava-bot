@@ -1,101 +1,309 @@
 const axios = require('axios');
 
-// --- Función para refrescar el access_token ---
-async function getAccessToken() {
-  try {
-    const response = await axios.post('https://www.strava.com/api/v3/oauth/token', {
-      client_id: process.env.STRAVA_CLIENT_ID,
-      client_secret: process.env.STRAVA_CLIENT_SECRET,
-      refresh_token: process.env.STRAVA_REFRESH_TOKEN,
-      grant_type: 'refresh_token'
-    });
-    return response.data.access_token;
-  } catch (err) {
-    console.error('Error al refrescar token:', err.response?.data || err.message);
-    process.exit(1);
+const STRAVA_API_BASE_URL = 'https://www.strava.com/api/v3';
+const STRAVA_OAUTH_URL = 'https://www.strava.com/api/v3/oauth/token';
+const REQUEST_TIMEOUT_MS = 15000;
+const DEFAULT_MAX_ACTIVITIES_TO_UPDATE = 1;
+const DEFAULT_FETCH_LIMIT = 10;
+const MAX_FETCH_LIMIT = 200;
+const SUPPORTED_SPORT_TYPES = new Set(['Run']);
+
+function getRequiredEnv(name) {
+  const value = process.env[name]?.trim();
+
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
   }
+
+  return value;
 }
 
-// --- Función para obtener actividades ---
-async function getActivities(accessToken) {
-  try {
-    const response = await axios.get(
-      'https://www.strava.com/api/v3/athlete/activities',
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        params: { per_page: 1 } //Número de actividades que se actualizan
-      }
-    );
-    return response.data;
-  } catch (err) {
-    console.error('Error al obtener actividades:', err.response?.data || err.message);
+function getPositiveIntEnv(name, fallbackValue) {
+  const rawValue = process.env[name];
+
+  if (rawValue == null || rawValue.trim() === '') {
+    return fallbackValue;
   }
+
+  const parsedValue = Number.parseInt(rawValue, 10);
+
+  if (!Number.isInteger(parsedValue) || parsedValue < 1) {
+    throw new Error(`Environment variable ${name} must be a positive integer.`);
+  }
+
+  return parsedValue;
 }
 
-// --- Función para actualizar una actividad ---
-async function updateActivity(accessToken, activityId, newDescription) {
-  try {
-    await axios.put(
-      `https://www.strava.com/api/v3/activities/${activityId}`,
-      { description: newDescription },
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    console.log(`Actividad ${activityId} actualizada correctamente.`);
-  } catch (err) {
-    console.error('Error al actualizar actividad:', err.response?.data || err.message);
+function getBooleanEnv(name, fallbackValue) {
+  const rawValue = process.env[name];
+
+  if (rawValue == null || rawValue.trim() === '') {
+    return fallbackValue;
   }
+
+  const normalizedValue = rawValue.trim().toLowerCase();
+
+  if (['1', 'true', 'yes', 'on'].includes(normalizedValue)) {
+    return true;
+  }
+
+  if (['0', 'false', 'no', 'off'].includes(normalizedValue)) {
+    return false;
+  }
+
+  throw new Error(`Environment variable ${name} must be a boolean value.`);
 }
 
-// --- Función para generar la descripción ---
+function loadConfig() {
+  const maxActivitiesToUpdate = getPositiveIntEnv(
+    'NUM_ACTIVITIES',
+    DEFAULT_MAX_ACTIVITIES_TO_UPDATE
+  );
+  const configuredFetchLimit = getPositiveIntEnv(
+    'STRAVA_FETCH_LIMIT',
+    Math.max(DEFAULT_FETCH_LIMIT, maxActivitiesToUpdate * 5)
+  );
+
+  return {
+    clientId: getRequiredEnv('STRAVA_CLIENT_ID'),
+    clientSecret: getRequiredEnv('STRAVA_CLIENT_SECRET'),
+    refreshToken: getRequiredEnv('STRAVA_REFRESH_TOKEN'),
+    maxActivitiesToUpdate,
+    fetchLimit: Math.min(
+      MAX_FETCH_LIMIT,
+      Math.max(configuredFetchLimit, maxActivitiesToUpdate)
+    ),
+    overwriteExisting: getBooleanEnv('STRAVA_OVERWRITE_EXISTING', false)
+  };
+}
+
+async function getAccessToken(config) {
+  const params = new URLSearchParams({
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+    refresh_token: config.refreshToken,
+    grant_type: 'refresh_token'
+  });
+
+  const response = await axios.post(STRAVA_OAUTH_URL, params, {
+    timeout: REQUEST_TIMEOUT_MS,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  });
+
+  return response.data.access_token;
+}
+
+function createStravaClient(accessToken) {
+  return axios.create({
+    baseURL: STRAVA_API_BASE_URL,
+    timeout: REQUEST_TIMEOUT_MS,
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+}
+
+async function getRecentActivities(stravaClient, fetchLimit) {
+  const response = await stravaClient.get('/athlete/activities', {
+    params: { per_page: fetchLimit }
+  });
+
+  return response.data;
+}
+
+async function getActivityDetail(stravaClient, activityId) {
+  const response = await stravaClient.get(`/activities/${activityId}`, {
+    params: {
+      include_all_efforts: true
+    }
+  });
+
+  return response.data;
+}
+
+async function updateActivityDescription(stravaClient, activityId, description) {
+  await stravaClient.put(`/activities/${activityId}`, {
+    description
+  });
+}
+
+function isSupportedActivity(activity) {
+  return SUPPORTED_SPORT_TYPES.has(activity?.sport_type ?? activity?.type);
+}
+
+function normalizeDescription(description) {
+  return (description ?? '').trim();
+}
+
+function getActivitySkipReason(activity, overwriteExisting) {
+  if (!activity) {
+    return 'activity payload is empty';
+  }
+
+  if (!isSupportedActivity(activity)) {
+    return `unsupported sport type "${activity.sport_type ?? activity.type ?? 'unknown'}"`;
+  }
+
+  if (!Number.isFinite(activity.distance) || activity.distance <= 0) {
+    return 'distance is empty or zero';
+  }
+
+  if (!Number.isFinite(activity.moving_time) || activity.moving_time <= 0) {
+    return 'moving time is empty or zero';
+  }
+
+  if (!overwriteExisting && normalizeDescription(activity.description) !== '') {
+    return 'description already exists';
+  }
+
+  return null;
+}
+
+function formatDuration(totalSeconds) {
+  const safeSeconds = Math.max(0, Math.round(totalSeconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function formatPace(movingTimeSeconds, distanceMeters) {
+  if (!Number.isFinite(movingTimeSeconds) || movingTimeSeconds <= 0) {
+    return null;
+  }
+
+  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) {
+    return null;
+  }
+
+  const secondsPerKilometer = Math.round(movingTimeSeconds / (distanceMeters / 1000));
+  const paceMinutes = Math.floor(secondsPerKilometer / 60);
+  const paceSeconds = secondsPerKilometer % 60;
+
+  return `${paceMinutes}:${String(paceSeconds).padStart(2, '0')}`;
+}
+
+function getPersonalBestSummary(activity) {
+  const personalBestEfforts = (activity.best_efforts ?? []).filter(
+    (effort) => effort?.pr_rank === 1 && effort?.name
+  );
+
+  if (personalBestEfforts.length === 0) {
+    return null;
+  }
+
+  const effortNames = personalBestEfforts.slice(0, 3).map((effort) => effort.name);
+
+  if (personalBestEfforts.length === 1) {
+    return `PR: ${effortNames[0]}`;
+  }
+
+  const suffix =
+    personalBestEfforts.length > effortNames.length
+      ? ` (+${personalBestEfforts.length - effortNames.length} mas)`
+      : '';
+
+  return `PRs: ${effortNames.join(', ')}${suffix}`;
+}
+
 function generateDescription(activity) {
   const distanceKm = (activity.distance / 1000).toFixed(1);
+  const pace = formatPace(activity.moving_time, activity.distance);
+  const elevationMeters = Math.round(activity.total_elevation_gain ?? 0);
+  const movingTime = formatDuration(activity.moving_time);
 
-  // cálculo ritmo (pace)
-  const paceMinutes = activity.moving_time / 60 / (activity.distance / 1000);
-  const paceMin = Math.floor(paceMinutes);
-  const paceSec = Math.round((paceMinutes - paceMin) * 60)
-    .toString()
-    .padStart(2, '0');
-  const paceFormatted = `${paceMin}:${paceSec}`;
+  const parts = [
+    `${distanceKm} km`,
+    pace ? `${pace} min/km` : null,
+    `+${elevationMeters} m`,
+    movingTime
+  ].filter(Boolean);
 
-  const elevation = activity.total_elevation_gain.toFixed(0);
+  const descriptionLines = [parts.join(' | ')];
+  const personalBestSummary = getPersonalBestSummary(activity);
 
-  // Formato principal
-  let desc = `${distanceKm} km 🏃‍♂️ | ${paceFormatted} min/km ⚡ | +${elevation} m ⛰️ | ${formatTime(activity.moving_time)} ⏱️`;
-
-  // PR general
-  if (activity.personal_record) {
-    desc += ' | ¡Nuevo récord en 10K! 🥇';
+  if (personalBestSummary) {
+    descriptionLines.push(personalBestSummary);
   }
 
-  // Segmentos conquistados
-  if (activity.segment_efforts && activity.segment_efforts.length > 0) {
-    desc += '\nSegmentos conquistados 👑';
-  }
-
-  return desc;
+  return descriptionLines.join('\n');
 }
 
-// --- Formatear tiempo total ---
-function formatTime(seconds) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return h > 0
-    ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-    : `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-// --- Función principal ---
 async function main() {
-  const accessToken = await getAccessToken();
-  const activities = await getActivities(accessToken);
-  if (!activities) return;
+  const config = loadConfig();
+  const accessToken = await getAccessToken(config);
+  const stravaClient = createStravaClient(accessToken);
+  const activities = await getRecentActivities(stravaClient, config.fetchLimit);
 
-  for (let act of activities) {
-    const newDesc = generateDescription(act);
-    await updateActivity(accessToken, act.id, newDesc);
+  if (!Array.isArray(activities) || activities.length === 0) {
+    console.log('No recent activities found.');
+    return;
   }
+
+  let updatedActivities = 0;
+
+  for (const activitySummary of activities) {
+    if (updatedActivities >= config.maxActivitiesToUpdate) {
+      break;
+    }
+
+    if (!isSupportedActivity(activitySummary)) {
+      console.log(
+        `Skipping activity ${activitySummary.id}: unsupported sport type "${activitySummary.sport_type ?? activitySummary.type ?? 'unknown'}".`
+      );
+      continue;
+    }
+
+    const activity = await getActivityDetail(stravaClient, activitySummary.id);
+    const skipReason = getActivitySkipReason(activity, config.overwriteExisting);
+
+    if (skipReason) {
+      console.log(`Skipping activity ${activity.id}: ${skipReason}.`);
+      continue;
+    }
+
+    const nextDescription = generateDescription(activity);
+    const currentDescription = normalizeDescription(activity.description);
+
+    if (currentDescription === nextDescription) {
+      console.log(`Skipping activity ${activity.id}: description is already up to date.`);
+      continue;
+    }
+
+    await updateActivityDescription(stravaClient, activity.id, nextDescription);
+    updatedActivities += 1;
+    console.log(`Updated activity ${activity.id}.`);
+  }
+
+  if (updatedActivities === 0) {
+    console.log('No activities needed updates.');
+    return;
+  }
+
+  console.log(`Completed successfully. Updated ${updatedActivities} activity(s).`);
 }
 
-main();
+if (require.main === module) {
+  main().catch((error) => {
+    const details = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+    console.error(`Strava bot failed: ${details}`);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  formatDuration,
+  formatPace,
+  generateDescription,
+  getActivitySkipReason,
+  isSupportedActivity,
+  loadConfig,
+  normalizeDescription
+};
