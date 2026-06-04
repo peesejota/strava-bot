@@ -202,7 +202,7 @@ function getPersonalBestSummary(activity) {
   const effortNames = personalBestEfforts.slice(0, 3).map((effort) => effort.name);
 
   if (personalBestEfforts.length === 1) {
-    return `PR: ${effortNames[0]}`;
+    return `🥇 PR: ${effortNames[0]}`;
   }
 
   const suffix =
@@ -210,7 +210,7 @@ function getPersonalBestSummary(activity) {
       ? ` (+${personalBestEfforts.length - effortNames.length} mas)`
       : '';
 
-  return `PRs: ${effortNames.join(', ')}${suffix}`;
+  return `🥇 PRs: ${effortNames.join(', ')}${suffix}`;
 }
 
 function generateDescription(activity) {
@@ -220,10 +220,10 @@ function generateDescription(activity) {
   const movingTime = formatDuration(activity.moving_time);
 
   const parts = [
-    `${distanceKm} km`,
-    pace ? `${pace} min/km` : null,
-    `+${elevationMeters} m`,
-    movingTime
+    `${distanceKm} km 🏃‍♂️`,
+    pace ? `${pace} min/km ⚡` : null,
+    `+${elevationMeters} m ⛰️`,
+    `${movingTime} ⏱️`
   ].filter(Boolean);
 
   const descriptionLines = [parts.join(' | ')];

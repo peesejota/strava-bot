@@ -7,19 +7,19 @@ Ahora mismo el bot:
 - Solo modifica actividades con `sport_type = Run`.
 - Ignora caminatas, gym y cualquier otra actividad.
 - Sobrescribe la descripcion existente, por ejemplo la que venga de COROS.
-- Revisa las `3` actividades más recientes y actualiza como maximo `1` por ejecución.
+- Revisa las `3` actividades mas recientes y actualiza como maximo `1` por ejecucion.
 - Evita escribir si la descripcion generada ya coincide con la actual.
 
 ## Formato de la descripcion
 
-Para una actividad `Run`, el bot genera una descripción con este formato:
+Para una actividad `Run`, el bot genera una descripcion con este formato:
 
 ```text
-10.0 km | 5:02 min/km | +84 m | 50:12
-PR: 10k
+10.0 km 🏃‍♂️ | 5:02 min/km ⚡ | +84 m ⛰️ | 50:12 ⏱️
+🥇 PR: 10k
 ```
 
-La segunda línea solo aparece si Strava devuelve esfuerzos con `pr_rank = 1`.
+La segunda linea solo aparece si Strava devuelve esfuerzos con `pr_rank = 1`.
 
 ## Como funciona
 
@@ -27,9 +27,9 @@ En cada ejecucion el bot hace este flujo:
 
 1. Refresca el `access_token` usando `client_id`, `client_secret` y `refresh_token`.
 2. Consulta las actividades recientes del atleta.
-3. Recorre las más recientes hasta encontrar una `Run` valida.
+3. Recorre las mas recientes hasta encontrar una `Run` valida.
 4. Pide el detalle de esa actividad.
-5. Genera una nueva descripción.
+5. Genera una nueva descripcion.
 6. Actualiza la actividad en Strava si hace falta.
 
 ## Variables de entorno
