@@ -6,7 +6,7 @@ const REQUEST_TIMEOUT_MS = 15000;
 const DEFAULT_MAX_ACTIVITIES_TO_UPDATE = 1;
 const DEFAULT_FETCH_LIMIT = 10;
 const MAX_FETCH_LIMIT = 200;
-const SUPPORTED_SPORT_TYPES = new Set(['Run']);
+const SUPPORTED_SPORT_TYPES = new Set(['Run', 'TrailRun']);
 
 function getRequiredEnv(name) {
   const value = process.env[name]?.trim();
